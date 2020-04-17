@@ -13,7 +13,8 @@
     * `interval` for sending ping requests at a custom interval
     * `timeout` for waiting a certain time period for a ping reply before sending new one.
     * `packetsize` for sending ICMP packets of required size (in bytes).
-* Supports both IPv4 & IPv6.
+* Supports both IPv4 & IPv6. 
+* Note: Currently, `pingo` does not support non-root access. For that a UDP message with a random number as `ID` needs to be sent. `non-privileged` mode will be added later.
 
 ## Usage
 `ping [-c=count] [-i=interval] [-t=timeout] [-ttl=TTL] [-s=packetsize] [-6] host`<br>
