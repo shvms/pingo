@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 )
 
 type Ping struct {
@@ -23,6 +24,7 @@ type Ping struct {
 	osPid            int
 	pingSize         uint
 	ttl              int
+	ipv6             bool
 
 	ipaddr *net.IPAddr
 	addr   string
@@ -51,6 +53,7 @@ func PingObj(addr string) (*Ping, error) {
 	p.ipaddr = ipaddr
 	p.pingSize = 32
 	p.ttl = 64
+	p.ipv6 = false
 
 	return p, nil
 }
@@ -96,7 +99,13 @@ func (p *Ping) start() error {
 
 	fmt.Printf("Pinging %s with %d bytes of data:\n", p.addr, p.pingSize)
 
-	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	var conn *icmp.PacketConn
+	var err error
+	if p.ipv6 {
+		conn, err = icmp.ListenPacket("ip6:ipv6-icmp", "[::]")
+	} else {
+		conn, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	}
 	if err != nil {
 		return err
 	}
@@ -108,10 +117,21 @@ func (p *Ping) start() error {
 		arbitraryMsg += "g"
 	}
 
-	conn.IPv4PacketConn().SetTTL(p.ttl)
+	if p.ipv6 {
+		conn.IPv6PacketConn().SetHopLimit(p.ttl)
+	} else {
+		conn.IPv4PacketConn().SetTTL(p.ttl)
+	}
+
+	var typ icmp.Type
+	if p.ipv6 {
+		typ = ipv6.ICMPTypeEchoRequest
+	} else {
+		typ = ipv4.ICMPTypeEcho
+	}
 	for {
 		msg := icmp.Message{
-			Type: ipv4.ICMPTypeEcho,
+			Type: typ,
 			Code: 0,
 			Body: &icmp.Echo{
 				ID:   p.osPid,
@@ -128,7 +148,8 @@ func (p *Ping) start() error {
 		sendTime := time.Now()
 		_, err = conn.WriteTo(msgBytes, p.ipaddr)
 		if err != nil {
-			fmt.Println("Sending failed. Retrying...")
+			fmt.Printf("Error: %s. Sending failed. Retrying...\n", err)
+			time.Sleep(time.Millisecond * time.Duration(p.interval))
 			continue
 		}
 		p.nPacketsSent++
@@ -148,13 +169,18 @@ func (p *Ping) start() error {
 			}
 		}
 		elapsedTime := time.Since(sendTime)
-		replyMsg, err := icmp.ParseMessage(ipv4.ICMPTypeEcho.Protocol(), replyBytes)
+
+		var replyMsg *icmp.Message
+		if p.ipv6 {
+			replyMsg, err = icmp.ParseMessage(ipv6.ICMPTypeEchoReply.Protocol(), replyBytes)
+		} else {
+			replyMsg, err = icmp.ParseMessage(ipv4.ICMPTypeEcho.Protocol(), replyBytes)
+		}
 		if err != nil {
 			return nil
 		}
 
-		switch replyMsg.Type {
-		case ipv4.ICMPTypeEchoReply:
+		if replyMsg.Type == ipv4.ICMPTypeEchoReply || replyMsg.Type == ipv6.ICMPTypeEchoReply {
 			switch pkt := replyMsg.Body.(type) {
 			case *icmp.Echo:
 				if pkt.ID == p.osPid {
@@ -165,17 +191,40 @@ func (p *Ping) start() error {
 					fmt.Printf("%s: Not our EchoReply", p.addr)
 				}
 			}
-		case ipv4.ICMPTypeDestinationUnreachable:
+		} else if replyMsg.Type == ipv4.ICMPTypeDestinationUnreachable || replyMsg.Type == ipv6.ICMPTypeEchoReply {
 			if _, ok := replyMsg.Body.(*icmp.DstUnreach); ok {
 				fmt.Printf("%s: Destination Host Unreacheable.\n", p.addr)
 			}
-		case ipv4.ICMPTypeTimeExceeded:
+		} else if replyMsg.Type == ipv4.ICMPTypeTimeExceeded || replyMsg.Type == ipv6.ICMPTypeTimeExceeded {
 			if _, ok := replyMsg.Body.(*icmp.TimeExceeded); ok {
 				fmt.Printf("%s: TTL Exceeded.\n", p.addr)
 			}
-		default:
+		} else {
 			fmt.Println("Unexpected ICMP message type.")
 		}
+		// switch replyMsg.Type {
+		// case ipv4.ICMPTypeEchoReply || ipv6.ICMPTypeEchoReply:
+		// 	switch pkt := replyMsg.Body.(type) {
+		// 	case *icmp.Echo:
+		// 		if pkt.ID == p.osPid {
+		// 			fmt.Printf("%d bytes from %s icmp_seq=%d ttl=%d rtt=%s\n", size, p.addr, p.nSequence-1, p.ttl, elapsedTime)
+		// 			p.nPacketsReceived++
+		// 			p.RTTs = append(p.RTTs, elapsedTime)
+		// 		} else {
+		// 			fmt.Printf("%s: Not our EchoReply", p.addr)
+		// 		}
+		// 	}
+		// case ipv4.ICMPTypeDestinationUnreachable || ipv6.ICMPTypeDestinationUnreachable:
+		// 	if _, ok := replyMsg.Body.(*icmp.DstUnreach); ok {
+		// 		fmt.Printf("%s: Destination Host Unreacheable.\n", p.addr)
+		// 	}
+		// case ipv4.ICMPTypeTimeExceeded || ipv6.ICMPTypeTimeExceeded:
+		// 	if _, ok := replyMsg.Body.(*icmp.TimeExceeded); ok {
+		// 		fmt.Printf("%s: TTL Exceeded.\n", p.addr)
+		// 	}
+		// default:
+		// 	fmt.Println("Unexpected ICMP message type.")
+		// }
 
 		if p.count > 0 && p.nPacketsReceived >= p.count {
 			p.GenerateStatistics()
