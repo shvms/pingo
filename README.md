@@ -1,2 +1,6 @@
 # Ping implementation in Go
-## Currently supports only IPv4
+## Installation
+* `git clone https://github.com.io/shvms/pingo.git`
+* `cd pingo`
+* `go build`
+* `./pingo google.com`

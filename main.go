@@ -10,6 +10,9 @@ var usage = `
 Ping implementation in Golang.
 ping [-c=count] [-i=interval] [-t=timeout] [-ttl=TTL value] [-s=packetsize] [-6] host
 ------------------------------------------------------------------
+Example:
+pingo -c=7 -i=1200 google.com
+
 count: Unsigned integer. 0 represents infinite ping.
 
 interval: Unsigned Integer. Interval between each ICMP Echo request (in ms). Defaults to 1000ms.
