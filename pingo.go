@@ -47,6 +47,7 @@ func PingObj(addr string) (*Ping, error) {
 	p := new(Ping)
 	p.count = 0
 	p.interval = 1000
+	p.timeout = 1000
 	p.nSequence = 1
 	p.osPid = os.Getpid() & 0xffff
 	p.addr = addr
@@ -57,42 +58,6 @@ func PingObj(addr string) (*Ping, error) {
 
 	return p, nil
 }
-
-// func (p *Ping) setIPAddr(ipaddr *net.IPAddr) {
-// 	p.ipaddr = ipaddr
-// }
-
-// func (p *Ping) setAddr(addr string) error {
-// 	ipaddr, err := net.ResolveIPAddr("ip", addr)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	p.setIPAddr(ipaddr)
-// 	p.addr = addr
-
-// 	return nil
-// }
-
-// func (p *Ping) setCount(c uint) {
-// 	p.count = c
-// 	fmt.Println(p.count, c)
-// }
-
-// func (p *Ping) setInterval(i uint) {
-// 	p.interval = i
-// }
-
-// func (p *Ping) setTimeout(t uint) {
-// 	p.timeout = t
-// }
-
-// func (p *Ping) setPingSize(s uint) {
-// 	if s < 8 {
-// 		fmt.Println("Cannot be lesser than 8 bytes. Defaulting to 8.")
-// 		s = 8
-// 	}
-// 	p.pingSize = s
-// }
 
 func (p *Ping) start() error {
 	CloseHandler(p)
@@ -156,7 +121,7 @@ func (p *Ping) start() error {
 		p.nSequence++
 
 		replyBytes := make([]byte, 1500)
-		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 1000))
+		conn.SetReadDeadline(time.Now().Add(time.Millisecond * time.Duration(p.timeout)))
 		size, _, err := conn.ReadFrom(replyBytes)
 		if err != nil {
 			if neterr, ok := err.(*net.OpError); ok {
@@ -202,29 +167,6 @@ func (p *Ping) start() error {
 		} else {
 			fmt.Println("Unexpected ICMP message type.")
 		}
-		// switch replyMsg.Type {
-		// case ipv4.ICMPTypeEchoReply || ipv6.ICMPTypeEchoReply:
-		// 	switch pkt := replyMsg.Body.(type) {
-		// 	case *icmp.Echo:
-		// 		if pkt.ID == p.osPid {
-		// 			fmt.Printf("%d bytes from %s icmp_seq=%d ttl=%d rtt=%s\n", size, p.addr, p.nSequence-1, p.ttl, elapsedTime)
-		// 			p.nPacketsReceived++
-		// 			p.RTTs = append(p.RTTs, elapsedTime)
-		// 		} else {
-		// 			fmt.Printf("%s: Not our EchoReply", p.addr)
-		// 		}
-		// 	}
-		// case ipv4.ICMPTypeDestinationUnreachable || ipv6.ICMPTypeDestinationUnreachable:
-		// 	if _, ok := replyMsg.Body.(*icmp.DstUnreach); ok {
-		// 		fmt.Printf("%s: Destination Host Unreacheable.\n", p.addr)
-		// 	}
-		// case ipv4.ICMPTypeTimeExceeded || ipv6.ICMPTypeTimeExceeded:
-		// 	if _, ok := replyMsg.Body.(*icmp.TimeExceeded); ok {
-		// 		fmt.Printf("%s: TTL Exceeded.\n", p.addr)
-		// 	}
-		// default:
-		// 	fmt.Println("Unexpected ICMP message type.")
-		// }
 
 		if p.count > 0 && p.nPacketsReceived >= p.count {
 			p.GenerateStatistics()
