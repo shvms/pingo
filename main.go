@@ -8,7 +8,7 @@ import (
 
 var usage = `
 Ping implementation in Golang.
-ping [-c=count] [-i=interval] [-t=timeout] [-s=packetsize] host
+ping [-c=count] [-i=interval] [-t=timeout] [-ttl=TTL value] [-s=packetsize] host
 ------------------------------------------------------------------
 count: Unsigned integer. 0 represents infinite ping.
 
@@ -17,6 +17,8 @@ interval: Unsigned Integer. Interval between each ICMP Echo request (in ms). Def
 timeout: Unsigned Integer. Timeout to wait for response from the host (in ms). Defaults to 1000ms.
 
 packetsize: Unsigned Integer. Packet size, in bytes, to ping with. Defaults to 32 bytes.
+
+TTL value: Integer. Time-to-live of the ICMP packets sent. Defaults to 64.
 `
 
 func main() {
@@ -24,6 +26,7 @@ func main() {
 	interval := flag.Uint("i", 1000, "Integer. Interval between each ICMP Echo request (in ms). Defaults to 1000ms.")
 	timeout := flag.Uint("t", 1000, "Unsigned Integer. Timeout to wait for response from the host (in ms). Defaults to 1000ms.")
 	packetSize := flag.Uint("s", 32, "Unsigned Integer. Packet size, in bytes, to ping with. Defaults to 32 bytes.")
+	ttl := flag.Int("ttl", 64, "Integer. Time-to-live of the ICMP packets sent. Defaults to 64.")
 	flag.Usage = func() {
 		fmt.Println(usage)
 	}
@@ -44,6 +47,7 @@ func main() {
 	ping.interval = *interval
 	ping.timeout = *timeout
 	ping.pingSize = *packetSize
+	ping.ttl = *ttl
 
 	err = ping.start()
 }

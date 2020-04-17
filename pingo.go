@@ -22,6 +22,7 @@ type Ping struct {
 	nSequence        int
 	osPid            int
 	pingSize         uint
+	ttl              int
 
 	ipaddr *net.IPAddr
 	addr   string
@@ -49,45 +50,46 @@ func PingObj(addr string) (*Ping, error) {
 	p.addr = addr
 	p.ipaddr = ipaddr
 	p.pingSize = 32
+	p.ttl = 64
 
 	return p, nil
 }
 
-func (p *Ping) setIPAddr(ipaddr *net.IPAddr) {
-	p.ipaddr = ipaddr
-}
+// func (p *Ping) setIPAddr(ipaddr *net.IPAddr) {
+// 	p.ipaddr = ipaddr
+// }
 
-func (p *Ping) setAddr(addr string) error {
-	ipaddr, err := net.ResolveIPAddr("ip", addr)
-	if err != nil {
-		return err
-	}
-	p.setIPAddr(ipaddr)
-	p.addr = addr
+// func (p *Ping) setAddr(addr string) error {
+// 	ipaddr, err := net.ResolveIPAddr("ip", addr)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	p.setIPAddr(ipaddr)
+// 	p.addr = addr
 
-	return nil
-}
+// 	return nil
+// }
 
-func (p *Ping) setCount(c uint) {
-	p.count = c
-	fmt.Println(p.count, c)
-}
+// func (p *Ping) setCount(c uint) {
+// 	p.count = c
+// 	fmt.Println(p.count, c)
+// }
 
-func (p *Ping) setInterval(i uint) {
-	p.interval = i
-}
+// func (p *Ping) setInterval(i uint) {
+// 	p.interval = i
+// }
 
-func (p *Ping) setTimeout(t uint) {
-	p.timeout = t
-}
+// func (p *Ping) setTimeout(t uint) {
+// 	p.timeout = t
+// }
 
-func (p *Ping) setPingSize(s uint) {
-	if s < 8 {
-		fmt.Println("Cannot be lesser than 8 bytes. Defaulting to 8.")
-		s = 8
-	}
-	p.pingSize = s
-}
+// func (p *Ping) setPingSize(s uint) {
+// 	if s < 8 {
+// 		fmt.Println("Cannot be lesser than 8 bytes. Defaulting to 8.")
+// 		s = 8
+// 	}
+// 	p.pingSize = s
+// }
 
 func (p *Ping) start() error {
 	CloseHandler(p)
@@ -106,6 +108,7 @@ func (p *Ping) start() error {
 		arbitraryMsg += "g"
 	}
 
+	conn.IPv4PacketConn().SetTTL(p.ttl)
 	for {
 		msg := icmp.Message{
 			Type: ipv4.ICMPTypeEcho,
@@ -155,7 +158,7 @@ func (p *Ping) start() error {
 			switch pkt := replyMsg.Body.(type) {
 			case *icmp.Echo:
 				if pkt.ID == p.osPid {
-					fmt.Printf("%d bytes from %s icmp_seq=%d rtt=%s\n", size, p.addr, p.nSequence-1, elapsedTime)
+					fmt.Printf("%d bytes from %s icmp_seq=%d ttl=%d rtt=%s\n", size, p.addr, p.nSequence-1, p.ttl, elapsedTime)
 					p.nPacketsReceived++
 					p.RTTs = append(p.RTTs, elapsedTime)
 				} else {
@@ -163,11 +166,15 @@ func (p *Ping) start() error {
 				}
 			}
 		case ipv4.ICMPTypeDestinationUnreachable:
-			fmt.Printf("%s: Destination Host Unreacheable", p.addr)
+			if _, ok := replyMsg.Body.(*icmp.DstUnreach); ok {
+				fmt.Printf("%s: Destination Host Unreacheable.\n", p.addr)
+			}
 		case ipv4.ICMPTypeTimeExceeded:
-			fmt.Printf("%s: Time Exceeded", p.addr)
+			if _, ok := replyMsg.Body.(*icmp.TimeExceeded); ok {
+				fmt.Printf("%s: TTL Exceeded.\n", p.addr)
+			}
 		default:
-			fmt.Println("Unexpected ICMP message type")
+			fmt.Println("Unexpected ICMP message type.")
 		}
 
 		if p.count > 0 && p.nPacketsReceived >= p.count {
