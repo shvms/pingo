@@ -54,4 +54,7 @@ func main() {
 	ping.ipv6 = *ipv6
 
 	err = ping.start()
+	if err != nil {
+		log.Fatalf("Error: %s", err)
+	}
 }

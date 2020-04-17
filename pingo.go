@@ -102,7 +102,7 @@ func (p *Ping) start() error {
 	var conn *icmp.PacketConn
 	var err error
 	if p.ipv6 {
-		conn, err = icmp.ListenPacket("ip6:ipv6-icmp", "[::]")
+		conn, err = icmp.ListenPacket("ip6:ipv6-icmp", "::")
 	} else {
 		conn, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	}
@@ -148,7 +148,7 @@ func (p *Ping) start() error {
 		sendTime := time.Now()
 		_, err = conn.WriteTo(msgBytes, p.ipaddr)
 		if err != nil {
-			fmt.Printf("Error: %s. Sending failed. Retrying...\n", err)
+			fmt.Println("Network unreacheable")
 			time.Sleep(time.Millisecond * time.Duration(p.interval))
 			continue
 		}
