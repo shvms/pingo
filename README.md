@@ -3,7 +3,7 @@
 * `git clone https://github.com/shvms/pingo.git`
 * `cd pingo`
 * `go build`
-* `./pingo google.com`
+* `sudo ./pingo google.com`
 
 ## Requirements
 * Reports RTT and loss percentage for sent messages. 
