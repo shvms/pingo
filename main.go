@@ -38,17 +38,18 @@ func main() {
 	}
 	flag.Parse()
 
-	if flag.NArg() == 0 {
+	if flag.NArg() == 0 { // if no arguments left
 		flag.Usage()
 		return
 	}
 
 	host := flag.Arg(0)
-	ping, err := PingObj(host)
+	ping, err := PingObj(host) // initialize ping object
 	if err != nil {
 		log.Fatalf("Error: %s", err)
 	}
 
+	// reset values
 	ping.count = *count
 	ping.interval = *interval
 	ping.timeout = *timeout

@@ -15,21 +15,21 @@ import (
 )
 
 type Ping struct {
-	count            uint
-	nPacketsSent     uint
-	nPacketsReceived uint
-	interval         uint
-	timeout          uint
-	nSequence        int
-	osPid            int
-	pingSize         uint
-	ttl              int
-	ipv6             bool
+	count            uint // number of packets sent and PacketsReceived before stop pinging
+	nPacketsSent     uint // number of packets sent
+	nPacketsReceived uint // number of packets received
+	interval         uint // interval between two ping requests in ms
+	timeout          uint // time (ms) to wait for a ICMP reply
+	nSequence        int  // sequence number
+	osPid            int  // process id
+	pingSize         uint // size (bytes) of ping message, including ICMP header
+	ttl              int  // time-to-live
+	ipv6             bool // is ipv6?
 
-	ipaddr *net.IPAddr
-	addr   string
+	ipaddr *net.IPAddr // ip address object
+	addr   string      // string address
 
-	RTTs       []time.Duration
+	RTTs       []time.Duration // all RTT times
 	minRTT     time.Duration
 	maxRTT     time.Duration
 	avgRTT     time.Duration
@@ -76,12 +76,14 @@ func (p *Ping) start() error {
 	}
 	defer conn.Close()
 
+	// construct arbitrary message of size p.pingSize-8 to send along with 8 bytes header
 	var arbitraryMsg string
 	var i uint
 	for i = 0; i < p.pingSize-8; i++ {
 		arbitraryMsg += "g"
 	}
 
+	// setting ttl values
 	if p.ipv6 {
 		conn.IPv6PacketConn().SetHopLimit(p.ttl)
 	} else {
@@ -94,7 +96,10 @@ func (p *Ping) start() error {
 	} else {
 		typ = ipv4.ICMPTypeEcho
 	}
+
+	// start pinging
 	for {
+		// constructing ICMP Echo Request message
 		msg := icmp.Message{
 			Type: typ,
 			Code: 0,
@@ -105,12 +110,13 @@ func (p *Ping) start() error {
 			},
 		}
 
+		// serializing msg object to byte-array
 		msgBytes, err := msg.Marshal(nil)
 		if err != nil {
 			return err
 		}
 
-		sendTime := time.Now()
+		sendTime := time.Now() // start timer
 		_, err = conn.WriteTo(msgBytes, p.ipaddr)
 		if err != nil {
 			fmt.Println("Network unreacheable")
@@ -133,8 +139,9 @@ func (p *Ping) start() error {
 				return err
 			}
 		}
-		elapsedTime := time.Since(sendTime)
+		elapsedTime := time.Since(sendTime) // RTT
 
+		// Parse reply according to the protocol used
 		var replyMsg *icmp.Message
 		if p.ipv6 {
 			replyMsg, err = icmp.ParseMessage(ipv6.ICMPTypeEchoReply.Protocol(), replyBytes)
@@ -145,6 +152,7 @@ func (p *Ping) start() error {
 			return nil
 		}
 
+		// log appropriate response
 		if replyMsg.Type == ipv4.ICMPTypeEchoReply || replyMsg.Type == ipv6.ICMPTypeEchoReply {
 			switch pkt := replyMsg.Body.(type) {
 			case *icmp.Echo:
@@ -177,8 +185,13 @@ func (p *Ping) start() error {
 	}
 }
 
+// Generate statistics report at the end of the session
 func (p *Ping) GenerateStatistics() {
-	p.packetLoss = float64(p.nPacketsSent-p.nPacketsReceived) / float64(p.nPacketsSent) * 100
+	if p.nPacketsSent == 0 {
+		p.packetLoss = float64(100)
+	} else {
+		p.packetLoss = float64(p.nPacketsSent-p.nPacketsReceived) / float64(p.nPacketsSent) * 100
+	}
 
 	if len(p.RTTs) > 0 {
 		p.minRTT = p.RTTs[0]
@@ -209,6 +222,7 @@ func (p *Ping) GenerateStatistics() {
 	fmt.Printf("Max/Min/Avg/StdDev/Total RTT ==> %v/%v/%v/%v/%v\n", p.maxRTT, p.minRTT, p.avgRTT, p.stdDevRtt, p.total)
 }
 
+// handles Ctrl-C signal
 func CloseHandler(p *Ping) {
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
