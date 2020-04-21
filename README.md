@@ -17,9 +17,9 @@
 * Note: Currently, `pingo` does not support non-root access. For that a UDP message with a random number as `ID` needs to be sent. `non-privileged` mode will be added later.
 
 ## Usage
-`ping [-c=count] [-i=interval] [-t=timeout] [-ttl=TTL] [-s=packetsize] [-6] host`<br>
+`sudo ./pingo [-c=count] [-i=interval] [-t=timeout] [-ttl=TTL] [-s=packetsize] [-6] host`<br>
 Example:
-`pingo -c=7 -i=1200 google.com`
+`sudo ./pingo -c=7 -i=1200 google.com`
 
 `count`: Unsigned integer. 0 represents infinite ping.<br>
 `interval`: Unsigned Integer. Interval between each ICMP Echo request (in ms). Defaults to 1000ms.<br>
